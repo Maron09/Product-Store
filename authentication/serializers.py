@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, PasswordResetToken
+from .models import User, PasswordResetToken, Userprofile
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -142,4 +142,25 @@ class PasswordResetSerializer(serializers.Serializer):
         user.save()
         
         PasswordResetToken.objects.filter(user=user).delete() 
+
+
+
+class UserProfilePicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Userprofile
+        fields = ["profile_pic"]
     
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.profile_pic:
+            data["profile_pic"] = instance.profile_pic.url
+        return  data
+    
+    def validate_profile_pic(self, value):
+        valid_extensions = ["jpg", "jpeg", "png"]
+        file_extension = value.name.split(".")[-1].lower()
+        
+        if file_extension not in valid_extensions:
+            raise serializers.ValidationError("Invalid file type. Only JPG, JPEG, and PNG are allowed.")
+        return value

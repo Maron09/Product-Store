@@ -12,7 +12,15 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = ()
 
 
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ["full_name", "profile_pic"]
+
+    def full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}"
+    full_name.admin_order_field = "user__first_name"  # Enable sorting
+    full_name.short_description = "Full Name"
+    
 admin.site.register(User, CustomUserAdmin)
-admin.site.register(Userprofile)
+admin.site.register(Userprofile, UserProfileAdmin)
 admin.site.register(EmailOTP)
 admin.site.register(PasswordResetToken)

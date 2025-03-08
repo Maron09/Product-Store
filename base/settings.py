@@ -52,7 +52,10 @@ INSTALLED_APPS = [
     
     
     'api',
-    'authentication'
+    'authentication',
+    'store',
+    'product',
+    'vendor',
 ]
 
 

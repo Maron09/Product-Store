@@ -8,7 +8,7 @@ class IsVendor(BasePermission):
 
 
 class IsCustomer(BasePermission):
-    """Allows access to only customers"""
+    """Allows access to only customers."""
     
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.is_customer()

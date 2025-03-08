@@ -1,15 +1,14 @@
-
 from django.shortcuts import get_object_or_404
 from rest_framework.generics import GenericAPIView
-from .serializers import CustomerSignUpSerializer, VendorSignUpSerializer, RequestNewOTPSerializer, LoginSerializer, LogoutSerializer, PasswordRestRequestSerializer, PasswordResetSerializer
+from .serializers import CustomerSignUpSerializer, VendorSignUpSerializer, RequestNewOTPSerializer, LoginSerializer, LogoutSerializer, PasswordRestRequestSerializer, PasswordResetSerializer, UserProfilePicSerializer
 from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
-from .models import User, EmailOTP
+from .models import User, EmailOTP, Userprofile
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .utils import send_otp
-from rest_framework import status, permissions
+from rest_framework import status, permissions, parsers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -542,7 +541,6 @@ class LogoutView(GenericAPIView):
     """
     
     permission_classes = [permissions.IsAuthenticated]
-    # authentication_classes = [JWTAuthentication]
     serializer_class = LogoutSerializer
     
     @swagger_auto_schema(
@@ -738,4 +736,57 @@ class PasswordResetView(GenericAPIView):
                 "message": serializer.errors,
             },
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+class UploadProfilePicView(GenericAPIView):
+    serializer_class = UserProfilePicSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser]
+
+    def get_object(self):
+        """Retrieve or create a UserProfile instance for the authenticated user."""
+        user_profile, created = Userprofile.objects.get_or_create(user=self.request.user)
+        return user_profile
+
+    @swagger_auto_schema(
+        operation_description="Upload a new profile picture (JPG, JPEG, PNG only)",
+        manual_parameters=[
+            openapi.Parameter(
+                "profile_pic",
+                openapi.IN_FORM,
+                description="Profile picture file (JPG, JPEG, PNG only)",
+                type=openapi.TYPE_FILE,
+                required=True,
+            )
+        ],
+        responses={
+            200: "Profile picture uploaded successfully",
+            400: "Invalid file format or bad request",
+        },
+    )
+    @transaction.atomic
+    def put(self, request, *args, **kwargs):
+        """Handles profile picture upload from OpenAPI."""
+        user_profile = self.get_object()
+        serializer = self.serializer_class(user_profile, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "success": True,
+                    "message": "Profile picture uploaded successfully",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "success": False,
+                "message": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
