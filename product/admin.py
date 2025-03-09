@@ -15,11 +15,14 @@ class CategoryAdmin(admin.ModelAdmin):
 
 class ProductAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug' : ('name',)}
-    list_display = ('name', 'category', 'vendor', 'price', 'modified_at')
+    list_display = ('name', 'category', 'get_vendor_business_name', 'price', 'modified_at')
     search_fields = ('name', 'category__title', 'vendor__business_name', 'price')
-    list_filter = ('in_stock',)
     inlines = [ProductImageInline]
-
+    
+    def get_vendor_business_name(self, obj):
+        return obj.vendor.business_name  
+    
+    get_vendor_business_name.short_description = 'Business Name'
 
 
 
