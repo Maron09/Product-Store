@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from authentication.models import Userprofile, User
+from authentication.models import Userprofile
 from product.models import Category, Product, ProductImage
 from django.utils.text import slugify
 

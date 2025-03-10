@@ -15,6 +15,7 @@ from .filters import ProductFilter
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.utils.functional import cached_property
 
 
 
@@ -29,32 +30,55 @@ class VendorProfileView(GenericAPIView):
     permission_classes = [permissions.IsAuthenticated, IsVendor]
     
     
-    def get_object(self):
+    @cached_property
+    def profile(self):
         user = self.request.user
         profile, _ = Userprofile.objects.get_or_create(user=user)
         return profile
     
     @swagger_auto_schema(
-        operation_description="Retrieve vendor profile",
-        responses={200: VendorProfileSerializer()}
+        operation_summary="Retrieve Vendor Profile",
+        operation_description="""
+        - Fetches the authenticated vendor's profile.
+        - If the profile doesn't exist, it is automatically created.
+        """,
+        responses={
+            200: openapi.Response(
+                "Vendor profile retrieved successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                "business_name": openapi.Schema(type=openapi.TYPE_STRING),
+                                "business_address": openapi.Schema(type=openapi.TYPE_STRING),
+                                "phone_number": openapi.Schema(type=openapi.TYPE_STRING),
+                                "is_verified": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            }
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response(
+                "Error Response",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "error": openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+        }
     )
     def get(self, request):
-        
-        profile = self.get_object()
-        if profile is None:
-            return Response (
-                {
-                    "success": False,
-                    "message": "You are not authorized to access this."
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-        serializer = self.serializer_class(profile)
+        serializer = self.serializer_class(self.profile)
         return Response(
-            {
-                "success": True,
-                "message": serializer.data
-            },
+            {"success": True, "message": serializer.data},
             status=status.HTTP_200_OK
         )
         
@@ -63,19 +87,9 @@ class VendorProfileView(GenericAPIView):
         request_body=VendorProfileSerializer,
         responses={200: "Vendor profile updated successfully", 400: "Invalid data"}
     )
+    @transaction.atomic
     def patch(self, request):
-        
-        
-        profile = self.get_object()
-        if profile is None:
-            return Response (
-                {
-                    "success": False,
-                    "message": "You are not authorized to access this."
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-        serializer = self.serializer_class(profile, data=request.data, partial=True)
+        serializer = self.serializer_class(self.profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -105,8 +119,47 @@ class CategoryView(GenericAPIView):
         return  [permissions.IsAuthenticated(), permissions.IsAdminUser()]
     
     
+    @swagger_auto_schema(
+        operation_summary="Retrieve All Categories",
+        operation_description="""
+        - Fetches a list of all available categories.
+        - This endpoint is accessible to **everyone** (no authentication required).
+        """,
+        responses={
+            200: openapi.Response(
+                "Categories retrieved successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    "title": openapi.Schema(type=openapi.TYPE_STRING),
+                                }
+                            )
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response(
+                "Error Response",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "error": openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+        }
+    )
+    
     def get(self, request):
-        
         categories = self.get_queryset()
         serializer = self.serializer_class(categories, many=True)
         return Response(
@@ -117,6 +170,51 @@ class CategoryView(GenericAPIView):
             },
             status=status.HTTP_200_OK
         )
+    
+    @swagger_auto_schema(
+        operation_summary="Create a New Category",
+        operation_description="""
+        - Creates a new category (admin only).
+        - If a category with the same title (case insensitive) already exists, it returns an error.
+        """,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "title": openapi.Schema(type=openapi.TYPE_STRING, description="Category title"),
+            },
+            required=["title"]
+        ),
+        responses={
+            201: openapi.Response(
+                "Category created successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                "title": openapi.Schema(type=openapi.TYPE_STRING),
+                            }
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response(
+                "Error Response",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+        }
+    )
+    
     
     @transaction.atomic
     def post(self, request):
@@ -153,12 +251,40 @@ class CategoryView(GenericAPIView):
 class CategoryDetailView(GenericAPIView):
     serializer_class = CategorySerializer
     permission_classes = [permissions.IsAdminUser]
+    queryset = Category.objects.all()
     
     def get_object(self, pk):
         try:
             return Category.objects.get(pk=pk)
         except Category.DoesNotExist:
             raise Http404
+    
+    @swagger_auto_schema(
+        operation_summary="Retrieve a Single Category",
+        operation_description="""
+        - Retrieves details of a single category by ID.
+        - Only **admin users** can access this endpoint.
+        """,
+        responses={
+            200: openapi.Response(
+                "Category retrieved successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                "title": openapi.Schema(type=openapi.TYPE_STRING),
+                            }
+                        )
+                    }
+                )
+            ),
+            404: openapi.Response("Category not found"),
+        }
+    )
     
     def get(self, request, pk):
         category = self.get_object(pk=pk)
@@ -169,6 +295,42 @@ class CategoryDetailView(GenericAPIView):
                 "message": serializer.data
             }
         )
+    
+    @swagger_auto_schema(
+        operation_summary="Update a Category (Partial)",
+        operation_description="""
+        - Updates a category's details (title).
+        - **Only admins** can perform this action.
+        - Supports partial updates (PATCH).
+        """,
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "title": openapi.Schema(type=openapi.TYPE_STRING, description="Updated category title"),
+            },
+        ),
+        responses={
+            200: openapi.Response(
+                "Category updated successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                "title": openapi.Schema(type=openapi.TYPE_STRING),
+                            }
+                        )
+                    }
+                )
+            ),
+            400: openapi.Response("Validation error"),
+            404: openapi.Response("Category not found"),
+        }
+    )
     
     @transaction.atomic
     def patch(self, request, pk):
@@ -191,6 +353,18 @@ class CategoryDetailView(GenericAPIView):
             }
         )
     
+    @swagger_auto_schema(
+        operation_summary="Delete a Category",
+        operation_description="""
+        - Deletes a category by ID.
+        - **Only admins** can delete categories.
+        - This action is irreversible.
+        """,
+        responses={
+            204: openapi.Response("Category deleted successfully"),
+            404: openapi.Response("Category not found"),
+        }
+    )
     
     @transaction.atomic
     def delete(self, request, pk):
@@ -211,17 +385,36 @@ class ProductView(GenericAPIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [permissions.AllowAny()]
-        return  [IsVendor()]
+        return  [permissions.IsAuthenticated(), IsVendor()]
     
     @swagger_auto_schema(
+        operation_summary="Retrieve a list of products",
+        operation_description="""
+        - Retrieves all products with optional filters.
+        - Supports pagination.
+        - Anyone can access this endpoint.
+        """,
         manual_parameters=[
-            openapi.Parameter("name", openapi.IN_QUERY, description="Filter by name", type=openapi.TYPE_STRING),
-            openapi.Parameter("category", openapi.IN_QUERY, description="Filter by category", type=openapi.TYPE_STRING),
-            openapi.Parameter("min_price", openapi.IN_QUERY, description="Minimum price", type=openapi.TYPE_NUMBER),
-            openapi.Parameter("max_price", openapi.IN_QUERY, description="Maximum price", type=openapi.TYPE_NUMBER),
-        ]
+            openapi.Parameter("name", openapi.IN_QUERY, description="Filter by product name", type=openapi.TYPE_STRING),
+            openapi.Parameter("category", openapi.IN_QUERY, description="Filter by category name", type=openapi.TYPE_STRING),
+            openapi.Parameter("min_price", openapi.IN_QUERY, description="Filter products with price greater than or equal to this value", type=openapi.TYPE_NUMBER),
+            openapi.Parameter("max_price", openapi.IN_QUERY, description="Filter products with price less than or equal to this value", type=openapi.TYPE_NUMBER),
+        ],
+        responses={
+            200: openapi.Response(
+                "Products retrieved successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)),
+                    },
+                ),
+            ),
+            400: openapi.Response("Invalid request parameters"),
+        },
     )
-    
     
     def get(self, request):
         products = self.filter_queryset(self.get_queryset())
@@ -238,6 +431,39 @@ class ProductView(GenericAPIView):
             }
         )
     
+    @swagger_auto_schema(
+        operation_summary="Create a new product",
+        operation_description="""
+        - Creates a new product (only accessible to authenticated vendors).
+        - Requires valid product details in the request body.
+        """,
+        request_body=ProductSerializer,
+        responses={
+            201: openapi.Response(
+                "Product created successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "data": openapi.Schema(type=openapi.TYPE_OBJECT),
+                    },
+                ),
+            ),
+            400: openapi.Response(
+                "Invalid data",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_STRING),
+                        "errors": openapi.Schema(type=openapi.TYPE_OBJECT),
+                    },
+                ),
+            ),
+        },
+    )
+    
     @transaction.atomic
     def post(self, request):
         serializer = self.serializer_class(data=request.data, context={"request": request})
@@ -246,7 +472,7 @@ class ProductView(GenericAPIView):
             return Response(
                 {
                     "success": True,
-                    "message": "Category created successfully",
+                    "message": "Product created successfully",
                     "data": serializer.data
                 },
                 status=status.HTTP_201_CREATED
@@ -254,7 +480,8 @@ class ProductView(GenericAPIView):
         return Response(
             {
                 "success": False,
-                "message": serializer.errors
+                "message": "Failed to create product",
+                "errors": serializer.errors 
             },
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -270,7 +497,7 @@ class ProductDetailView(GenericAPIView):
         """Allow anyone to view, but only vendors to modify"""
         if self.request.method == "GET":
             return [permissions.AllowAny()]
-        return [IsVendor()]
+        return [permissions.IsAuthenticated(), IsVendor()]
     
     def get_object(self, pk, check_owner=False):
         """Retrieve product, and optionally enforce ownership check"""
@@ -282,6 +509,24 @@ class ProductDetailView(GenericAPIView):
         except Product.DoesNotExist:
             raise Http404
     
+    @swagger_auto_schema(
+        operation_summary="Retrieve a single product",
+        operation_description="Returns product details based on its ID. Accessible to everyone.",
+        responses={
+            200: openapi.Response(
+                "Product retrieved successfully",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        "message": openapi.Schema(type=openapi.TYPE_OBJECT),
+                    },
+                ),
+            ),
+            404: "Product not found",
+        },
+    )
+    
     def get(self, request, pk):
         product = self.get_object(pk)
         serializer = ProductSerializer(product)
@@ -291,6 +536,18 @@ class ProductDetailView(GenericAPIView):
                 "message": serializer.data
             }
         )
+    
+    @swagger_auto_schema(
+        operation_summary="Update a product",
+        operation_description="Only the product owner (vendor) can update the product.",
+        request_body=ProductSerializer,
+        responses={
+            200: "Product updated successfully",
+            400: "Invalid request data",
+            403: "Permission denied",
+            404: "Product not found",
+        },
+    )
     
     @transaction.atomic
     def patch(self, request, pk):
@@ -313,6 +570,16 @@ class ProductDetailView(GenericAPIView):
             }
         )
     
+    @swagger_auto_schema(
+        operation_summary="Delete a product",
+        operation_description="Only the product owner (vendor) can delete the product.",
+        responses={
+            204: "Product deleted successfully",
+            403: "Permission denied",
+            404: "Product not found",
+        },
+    )
+    
     @transaction.atomic
     def delete(self, request, pk):
         product = self.get_object(pk, check_owner=True)
@@ -323,9 +590,38 @@ class ProductDetailView(GenericAPIView):
 
 class ProductImageUploadView(GenericAPIView):
     serializer_class = ProductImageSerializer
-    permission_classes = [IsVendor]
+    permission_classes = [permissions.IsAuthenticated, IsVendor]
     parser_classes = [MultiPartParser, FormParser]  
 
+    @swagger_auto_schema(
+        operation_summary="Upload images for a product",
+        operation_description="Allows vendors to upload up to 5 images per product.",
+        manual_parameters=[
+            openapi.Parameter(
+                name="image",
+                in_=openapi.IN_FORM,
+                type=openapi.TYPE_FILE,
+                description="Multiple images for the product",
+                required=True,
+            ),
+            openapi.Parameter(
+                name="product_id",
+                in_=openapi.IN_PATH,
+                description="ID of the product to upload images for",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            ),
+        ],
+        responses={
+            200: openapi.Response("Images uploaded successfully"),
+            400: "Invalid request or image limit exceeded",
+            403: "Permission denied",
+            404: "Product not found",
+        },
+    )
+
+    
+    @transaction.atomic
     def put(self, request, product_id):
         """
         Upload multiple images for a product (Max 5 images).

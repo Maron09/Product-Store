@@ -22,6 +22,9 @@ urlpatterns = [
     # Product
     path("products/", ProductView.as_view()),
     
+    # Vendor
+    path("vendor/", include("vendor.urls")),
     
-    path("vendor/", include("vendor.urls"))
+    # Customer
+    path('customer/', include('customer.urls'))
 ]

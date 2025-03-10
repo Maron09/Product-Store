@@ -11,6 +11,7 @@ from .utils import send_otp
 from rest_framework import status, permissions, parsers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils.functional import cached_property
 
 
 class CustomerSignUpView(GenericAPIView):
@@ -745,7 +746,8 @@ class UploadProfilePicView(GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [parsers.MultiPartParser]
 
-    def get_object(self):
+    @cached_property
+    def profile(self):
         """Retrieve or create a UserProfile instance for the authenticated user."""
         user_profile, created = Userprofile.objects.get_or_create(user=self.request.user)
         return user_profile
@@ -769,7 +771,7 @@ class UploadProfilePicView(GenericAPIView):
     @transaction.atomic
     def put(self, request, *args, **kwargs):
         """Handles profile picture upload from OpenAPI."""
-        user_profile = self.get_object()
+        user_profile = self.profile
         serializer = self.serializer_class(user_profile, data=request.data, partial=True)
 
         if serializer.is_valid():

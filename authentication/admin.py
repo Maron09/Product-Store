@@ -13,7 +13,7 @@ class CustomUserAdmin(UserAdmin):
 
 
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ["full_name", "profile_pic"]
+    list_display = ["full_name", "profile_pic", "address"]
 
     def full_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}"
