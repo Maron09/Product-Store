@@ -1,7 +1,6 @@
 from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404, GenericAPIView
-from rest_framework.parsers import JSONParser
 from .models import Cart
 from .serializers import CartSerializer
 from authentication.permissions import IsCustomer
@@ -18,6 +17,12 @@ class CartView(GenericAPIView):
     queryset = Cart.objects.all()
     
     
+    @swagger_auto_schema(
+        operation_summary="Retrieve cart items",
+        operation_description="Fetch all items in the authenticated user's cart.",
+        responses={200: CartSerializer(many=True)}
+    )
+    
     def get(self, request):
         cart_items = Cart.objects.filter(customer=request.user)
         serializer = self.serializer_class(cart_items, many=True)
@@ -30,6 +35,15 @@ class CartView(GenericAPIView):
             status=status.HTTP_200_OK
         )
 
+    @swagger_auto_schema(
+        operation_summary="Add product to cart",
+        operation_description="Add a new product to the authenticated user's cart.",
+        request_body=CartSerializer,
+        responses={
+            201: openapi.Response("Product added to cart", CartSerializer),
+            400: "Bad request - validation errors"
+        }
+    )
     
     @transaction.atomic
     def post(self, request):
@@ -68,6 +82,12 @@ class CartDetailView(GenericAPIView):
         """Fetch a single cart item belonging to the user"""
         return get_object_or_404(Cart, id=cart_id, customer=self.request.user)
     
+    @swagger_auto_schema(
+        operation_summary="Retrieve cart item details",
+        operation_description="Fetch the details of a specific item in the authenticated user's cart.",
+        responses={200: CartSerializer, 404: "Cart item not found"}
+    )
+    
     def get(self, request, cart_id):
         """Retrieve details of a specific cart item"""
         cart_item = self.get_object(cart_id)
@@ -76,6 +96,17 @@ class CartDetailView(GenericAPIView):
             {"success": True, "data": serializer.data},
             status=status.HTTP_200_OK
         )
+    
+    @swagger_auto_schema(
+        operation_summary="Update cart item quantity",
+        operation_description="Modify the quantity of an item in the authenticated user's cart.",
+        request_body=CartSerializer,
+        responses={
+            200: openapi.Response("Cart quantity updated", CartSerializer),
+            400: "Bad request - validation errors",
+            404: "Cart item not found"
+        }
+    )
     
     @transaction.atomic
     def patch(self, request, cart_id):
@@ -98,6 +129,16 @@ class CartDetailView(GenericAPIView):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+    @swagger_auto_schema(
+        operation_summary="Remove item from cart",
+        operation_description="Delete a specific item from the authenticated user cart.",
+        responses={
+            204: "Item removed from cart",
+            404: "Cart item not found"
+        }
+    )
+    
     
     @transaction.atomic
     def delete(self, request, cart_id):
